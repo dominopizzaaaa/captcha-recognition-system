@@ -1,0 +1,50 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# ===== Virtual Environment =====
+.venv/
+env/
+venv/
+ENV/
+*.env
+
+# ===== IDE & OS Files =====
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ===== Checkpoints & Logs =====
+*.log
+*.ckpt
+*.pth
+*.pt
+*.h5
+*.onnx
+
+# ===== Generated Data =====
+data/processed/
+data/debug/
+models/
+figures/
+runs/
+outputs/
+__results__/
+
+# ===== Jupyter Notebooks =====
+.ipynb_checkpoints/
+
+# ===== Temporary Files =====
+*.tmp
+*.bak
+*.swp
+*.zip
+*.tar.gz
+
+# ===== System Cache =====
+*.cache/
+*.pytest_cache/
