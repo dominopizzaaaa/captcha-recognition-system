@@ -34,14 +34,43 @@ def preprocess_image(img_path):
         gray, 255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY, 
-        15, 5   
+        15, 5
     )
 
-    # 4. Optional inversion: ensure letters are white
+    # 4. Morphological cleanup (open → erode → dilate)
+    # 'open' removes thin noise lines that cross letters
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel, iterations=1)
+
+    # light erosion breaks tiny bridges between characters
+    binary = cv2.erode(binary, kernel, iterations=1)
+
+    # light dilation restores character thickness after erosion
+    binary = cv2.dilate(binary, kernel, iterations=1)
+
+    # 5. Ensure letters are white, background black
     white_pixels = np.sum(binary == 255)
     black_pixels = np.sum(binary == 0)
     if white_pixels < black_pixels:
         binary = cv2.bitwise_not(binary)
+
+    # 6. --- Remove long lines (horizontal/vertical/diagonal) WITHOUT rotating ---
+    # detect straight lines and paint them out
+    inv = cv2.bitwise_not(binary)                    # lines bright for edge detection
+    edges = cv2.Canny(inv, 50, 150, apertureSize=3)
+    # HoughLinesP finds straight segments at any angle
+    lines = cv2.HoughLinesP(
+        edges, rho=1, theta=np.pi/180, threshold=60,
+        minLineLength=max(20, binary.shape[1]//10),  # long enough to be nuisance lines
+        maxLineGap=10
+    )
+    if lines is not None:
+        # draw over detected lines with background color (black in 'binary')
+        for x1, y1, x2, y2 in lines[:, 0]:
+            cv2.line(binary, (x1, y1), (x2, y2), color=0, thickness=2)
+
+    # 7. Final light clean (close tiny gaps after line removal)
+    binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel, iterations=1)
 
     return binary
 
