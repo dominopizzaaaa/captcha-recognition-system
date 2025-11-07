@@ -100,16 +100,13 @@ def kmeans(img, k):
 
 def getSegmentedImages(xx, k):
   x = xx.squeeze(0)
-  print(x.shape, xx.shape)
   x = (np.transpose(x.cpu().numpy(), (1, 2, 0)) * 255).astype(np.uint8)
   H, W, C = x.shape
 
   labels, centers = kmeans(x, k)
-  print(x.shape, labels.shape, centers.shape)
   x_coords = torch.linspace(0, W, W, device=x.device)
   x_coords = x_coords.view(1, W, 1).expand(H, W, 1)
 
-  cv2.imwrite("segmented.png", np.array(x))
 
   cols = []  
   for col in range(k):

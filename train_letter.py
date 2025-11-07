@@ -186,6 +186,8 @@ class LetterCNN(nn.Module):
         x = self.fc(x)                # (B, n_classes)
         return x
 
+
+
 def train():
   # ===== Data =====
   train_ds = CSVPadHeightDataset(CSV_TRAIN, classes=CLASSES, target_height=TARGET_HEIGHT, grayscale=True, augment=AUGMENT)

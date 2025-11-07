@@ -1,5 +1,5 @@
 import os, csv, pathlib
-DATA_DIR = r"./data/test"  # <- change this to your folder
+DATA_DIR = r"./data/train"  # <- change this to your folder
 rows = []
 for root,_,files in os.walk(DATA_DIR):
     for f in files:

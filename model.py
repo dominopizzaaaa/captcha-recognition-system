@@ -5,6 +5,7 @@ from kmeans import kmeans, getSegmentedImages
 import torchvision.transforms.functional as TF
 import cv2
 import numpy as np
+import pandas as pd
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -34,7 +35,6 @@ class CountNetMasked(nn.Module):
         return feat_sum / denom                                             # [B,C]
 
     def forward(self, x, mask):
-        print(x.device, mask.device)
         f = self.features(x)
         p = self.masked_gap(f, mask)
         return self.head(p)
@@ -126,8 +126,7 @@ class CaptchaSolver(nn.Module):
         for i in range(len(segmentedImages)):
             im_t.append(TF.to_tensor(segmentedImages[i]).unsqueeze(0))
 
-        im_t = torch.cat(im_t, dim=0)
-        print(im_t.shape)
+        im_t = torch.cat(im_t, dim=0).to(DEVICE)
 
         y = self.letterCNN(im_t)
     
@@ -150,9 +149,18 @@ def predict_image(img):
     x = x.unsqueeze(0).to(DEVICE)
     logits = model(x, mask)
     idx = logits.argmax(1)
-    print(idx)
     return "".join(np.array(letter_ckpt["classes"])[idx.cpu().numpy()])
 
-img = cv2.imread("./data/test/ui7l-0.png")
-# img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-print(predict_image(img))
+csv_path = "./data/test/labels.csv"
+
+samples = pd.read_csv(csv_path)
+
+for row in samples["path"]:
+    img = cv2.imread(f"./data/test/{row}")
+    predicted = predict_image(img)
+    truth = row.split('-0')[0]
+    print(predicted, truth)
+
+# img = cv2.imread("./data/test/rv3io-0.png")
+# # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+# print(predict_image(img))
