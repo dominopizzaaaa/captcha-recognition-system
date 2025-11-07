@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image, ImageFilter
 import torchvision.transforms.functional as TF
+from torchvision.models import resnet18, ResNet18_Weights
 
 # ===== Config =====
 CSV_TRAIN = "data_letter/train/labels.csv"   # path,label (no header)
@@ -64,6 +65,7 @@ def random_geometric(img: Image.Image) -> Image.Image:
     ty = random.uniform(-0.02, 0.02) * img.size[1]
     scale = random.uniform(0.98, 1.02)
     return TF.affine(img, angle=angle, translate=(tx, ty), scale=scale, shear=0)
+
 
 # ===== Custom Dataset =====
 class CSVPadHeightDataset(Dataset):
@@ -123,22 +125,67 @@ def collate_pad_width(batch):
 
 # ===== Model: handles variable width via global pooling =====
 class LetterCNN(nn.Module):
-    def __init__(self, n_classes: int, in_ch=1):
+    def __init__(self, n_classes: int, in_ch: int = 1,
+                 pretrained: bool = True,
+                 freeze_backbone: bool = False):
         super().__init__()
+
+        # Load base ResNet18
+        weights = ResNet18_Weights.IMAGENET1K_V1 if pretrained else None
+        base = resnet18(weights=weights)
+
+        # Adapt first conv for custom input channels
+        if in_ch != 3:
+            old_conv = base.conv1
+            base.conv1 = nn.Conv2d(
+                in_ch,
+                old_conv.out_channels,
+                kernel_size=old_conv.kernel_size,
+                stride=old_conv.stride,
+                padding=old_conv.padding,
+                bias=old_conv.bias is not None,
+            )
+            with torch.no_grad():
+                if pretrained:
+                    if in_ch == 1:
+                        # Average RGB weights -> 1 channel
+                        base.conv1.weight[:] = old_conv.weight.mean(dim=1, keepdim=True)
+                    elif in_ch > 3:
+                        # For >3 channels, repeat and trim (simple heuristic)
+                        repeat_factor = (in_ch + 2) // 3
+                        w = old_conv.weight.repeat(1, repeat_factor, 1, 1)[:, :in_ch]
+                        base.conv1.weight[:] = w
+                    else:  # in_ch == 2, etc.
+                        w = old_conv.weight[:, :in_ch]
+                        base.conv1.weight[:] = w
+
+        # Take everything except the original avgpool & fc
         self.features = nn.Sequential(
-            nn.Conv2d(in_ch, 32, 3, padding=1), nn.BatchNorm2d(32), nn.ReLU(), nn.MaxPool2d((2,2)),
-            nn.Conv2d(32, 64, 3, padding=1),   nn.BatchNorm2d(64), nn.ReLU(), nn.MaxPool2d((2,2)),
-            nn.Conv2d(64, 128, 3, padding=1),  nn.BatchNorm2d(128),nn.ReLU(), nn.MaxPool2d((2,2)),
-            nn.Conv2d(128,256, 3, padding=1),  nn.BatchNorm2d(256),nn.ReLU(), nn.MaxPool2d((2,2)),
+            base.conv1,
+            base.bn1,
+            base.relu,
+            base.maxpool,
+            base.layer1,
+            base.layer2,
+            base.layer3,
+            base.layer4,
         )
-        # Adaptive pool to 1×1 regardless of remaining H×W
-        self.pool = nn.AdaptiveAvgPool2d((1,1))
-        self.fc = nn.Linear(256, n_classes)
+
+        # Global pooling for arbitrary H, W
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(base.fc.in_features, n_classes)
+
+        # Optionally freeze backbone
+        if freeze_backbone:
+            for p in self.features.parameters():
+                p.requires_grad = False
 
     def forward(self, x):
-        x = self.features(x)          # (B,256,h',w')
-        x = self.pool(x).flatten(1)   # (B,256)
-        return self.fc(x)
+        x = self.features(x)          # (B, C, h', w')
+        x = self.pool(x).flatten(1)   # (B, C)
+        x = self.fc(x)                # (B, n_classes)
+        return x
+
 def train():
   # ===== Data =====
   train_ds = CSVPadHeightDataset(CSV_TRAIN, classes=CLASSES, target_height=TARGET_HEIGHT, grayscale=True, augment=AUGMENT)

@@ -113,6 +113,7 @@ class CountNetMasked(nn.Module):
 
     def forward(self, x, mask):
         f = self.features(x)
+        print(x.shape, f.shape, mask.shape)
         p = self.masked_gap(f, mask)
         return self.head(p)
 

@@ -3,7 +3,7 @@ from kmeans import kmeans
 import cv2
 import numpy as np
 
-split = "test"
+split = "train"
 DATA_DIR = f"./data/{split}"  # <- change this to your folder
 DEST_DIR = f"./data_letter/{split}"
 rows = []
