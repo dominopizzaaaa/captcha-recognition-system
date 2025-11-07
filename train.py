@@ -6,6 +6,8 @@ from torch import nn
 from torch.utils.data import Dataset, DataLoader
 import torchvision
 from torchvision import transforms
+from torchvision.models import resnet18, ResNet18_Weights
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 # -------- Dataset: keeps native H (<= max_h), clamps very long W if wanted --------
 class VarSizeDataset(Dataset):
@@ -85,13 +87,20 @@ def collate_varsize(batch):
 
 # -------- Model: ResNet18 trunk + masked global average pooling + regressor --------
 class CountNetMasked(nn.Module):
-    def __init__(self):
+    def __init__(self, pretrained=True):
         super().__init__()
-        backbone = torchvision.models.resnet18(weights=None)
-        self.features = nn.Sequential(*list(backbone.children())[:-2])  # -> [B,512,Hf,Wf]
+        if pretrained:
+            backbone = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+        else:
+            backbone = resnet18(weights=None)
+
+        self.features = nn.Sequential(*list(backbone.children())[:-2])  # conv -> layer4
         self.head = nn.Sequential(
-            nn.Linear(512, 256), nn.ReLU(inplace=True), nn.Dropout(0.2),
-            nn.Linear(256, 1), nn.Softplus()
+            nn.Linear(512, 256),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.2),
+            nn.Linear(256, 1),
+            nn.Softplus()
         )
 
     @staticmethod
@@ -123,6 +132,8 @@ def train(args):
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
     loss_fn = nn.MSELoss()
     scaler = torch.cuda.amp.GradScaler(enabled=args.amp and (device=="cuda"))
+
+    scheduler = CosineAnnealingLR(opt, T_max=args.epochs)
 
     def evaluate():
         model.eval()
@@ -167,6 +178,8 @@ def train(args):
             }, args.out)
             print("  Saved", args.out)
 
+        scheduler.step()
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--train_dir", type=str, required=True)
@@ -179,7 +192,7 @@ if __name__ == "__main__":
     ap.add_argument("--epochs",    type=int, default=12)
     ap.add_argument("--batch_size",type=int, default=64)
     ap.add_argument("--val_batch", type=int, default=256)
-    ap.add_argument("--lr",        type=float, default=2e-4)
+    ap.add_argument("--lr",        type=float, default=5e-5)
     ap.add_argument("--workers",   type=int, default=2)
     ap.add_argument("--amp",       action="store_true")
     args = ap.parse_args(); train(args)
