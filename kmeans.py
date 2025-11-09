@@ -13,7 +13,7 @@ def add_pos_channels(img: torch.Tensor, mode: str = "norm"):
   assert C == 3, "Expected 3-channel input"
 
   if mode == "norm":
-    xs = torch.linspace(0, 2000, W, device=img.device)
+    xs = torch.linspace(0 ,8000, W, device=img.device)
     ys = torch.linspace(0, 0, H, device=img.device)
   elif mode == "minus1to1":
     xs = torch.linspace(-1, 1, W, device=img.device)
@@ -28,8 +28,8 @@ def add_pos_channels(img: torch.Tensor, mode: str = "norm"):
   
   white_mask = (torch.from_numpy(img) == 255).all(dim=-1, keepdim=True)
   x_grid = x_grid.clone()
-  x_grid[white_mask] = 255
-  y_grid[white_mask] = 255
+  x_grid[white_mask] = 0
+  y_grid[white_mask] = 0
 
   
   # Concat: (3 + 2, H, W)
@@ -99,8 +99,9 @@ def kmeans(img, k):
   # cv2.imwrite("segmented.png", segmented_image)
 
 def getSegmentedImages(xx, k):
-  x = xx.squeeze(0)
-  x = (np.transpose(x.cpu().numpy(), (1, 2, 0)) * 255).astype(np.uint8)
+  # x = xx.squeeze(0)
+  x = xx
+  # x = (np.transpose(x.cpu().numpy(), (1, 2, 0)) * 255).astype(np.uint8)
   H, W, C = x.shape
 
   labels, centers = kmeans(x, k)

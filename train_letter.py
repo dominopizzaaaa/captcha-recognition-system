@@ -8,16 +8,16 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image, ImageFilter
 import torchvision.transforms.functional as TF
-from torchvision.models import resnet18, ResNet18_Weights
+from modeling_letter import LetterCNN
 
 # ===== Config =====
 CSV_TRAIN = "data_letter/train/labels.csv"   # path,label (no header)
 CSV_VAL   = "data_letter/test/labels.csv"
 TARGET_HEIGHT = 80        # we will pad to this height
-BATCH_SIZE = 512
-EPOCHS = 1000
-LR = 3e-4
-WEIGHT_DECAY = 1e-4
+BATCH_SIZE = 1024
+EPOCHS = 5000
+LR = 1e-4
+WEIGHT_DECAY = 0.01
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 AUGMENT = True
 
@@ -89,11 +89,11 @@ class CSVPadHeightDataset(Dataset):
         if self.augment:
             if random.random() < 0.5:
                 img = random_geometric(img)
-            if random.random() < 0.2:
-                img = img.filter(ImageFilter.GaussianBlur(radius=1))
+            # if random.random() < 0.2:
+                # img = img.filter(ImageFilter.GaussianBlur(radius=1))
 
         # Pad/crop vertically to target height; width left as-is
-        img = pad_to_height(img, self.target_height, fill=0)
+        img = pad_to_height(img, self.target_height, fill=255)
 
         # To tensor & normalize (-1..1). Width is variable here.
         x = TF.to_tensor(img)
@@ -123,69 +123,6 @@ def collate_pad_width(batch):
     y = torch.tensor(ys, dtype=torch.long)
     return x, y
 
-# ===== Model: handles variable width via global pooling =====
-class LetterCNN(nn.Module):
-    def __init__(self, n_classes: int, in_ch: int = 1,
-                 pretrained: bool = True,
-                 freeze_backbone: bool = False):
-        super().__init__()
-
-        # Load base ResNet18
-        weights = ResNet18_Weights.IMAGENET1K_V1 if pretrained else None
-        base = resnet18(weights=weights)
-
-        # Adapt first conv for custom input channels
-        if in_ch != 3:
-            old_conv = base.conv1
-            base.conv1 = nn.Conv2d(
-                in_ch,
-                old_conv.out_channels,
-                kernel_size=old_conv.kernel_size,
-                stride=old_conv.stride,
-                padding=old_conv.padding,
-                bias=old_conv.bias is not None,
-            )
-            with torch.no_grad():
-                if pretrained:
-                    if in_ch == 1:
-                        # Average RGB weights -> 1 channel
-                        base.conv1.weight[:] = old_conv.weight.mean(dim=1, keepdim=True)
-                    elif in_ch > 3:
-                        # For >3 channels, repeat and trim (simple heuristic)
-                        repeat_factor = (in_ch + 2) // 3
-                        w = old_conv.weight.repeat(1, repeat_factor, 1, 1)[:, :in_ch]
-                        base.conv1.weight[:] = w
-                    else:  # in_ch == 2, etc.
-                        w = old_conv.weight[:, :in_ch]
-                        base.conv1.weight[:] = w
-
-        # Take everything except the original avgpool & fc
-        self.features = nn.Sequential(
-            base.conv1,
-            base.bn1,
-            base.relu,
-            base.maxpool,
-            base.layer1,
-            base.layer2,
-            base.layer3,
-            base.layer4,
-        )
-
-        # Global pooling for arbitrary H, W
-        self.pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(base.fc.in_features, n_classes)
-
-        # Optionally freeze backbone
-        if freeze_backbone:
-            for p in self.features.parameters():
-                p.requires_grad = False
-
-    def forward(self, x):
-        x = self.features(x)          # (B, C, h', w')
-        x = self.pool(x).flatten(1)   # (B, C)
-        x = self.fc(x)                # (B, n_classes)
-        return x
-
 
 
 def train():
@@ -202,7 +139,9 @@ def train():
   print("Classes:", train_ds.classes)
 
   # ===== Train =====
-  model = LetterCNN(num_classes, in_ch=in_ch).to(DEVICE)
+  model = LetterCNN(num_classes, in_ch=in_ch, freeze_backbone=False).to(DEVICE)
+#   weights = torch.load("letter_padheight_best.pt")
+#   model.load_state_dict(weights['model'])
   optimizer = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
   scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
   criterion = nn.CrossEntropyLoss()

@@ -22,7 +22,7 @@ Thumbs.db
 *.log
 *.ckpt
 *.pth
-*.pt
+.pt
 *.h5
 *.onnx
 
