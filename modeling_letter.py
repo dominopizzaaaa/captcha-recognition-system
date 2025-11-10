@@ -60,7 +60,7 @@ class LetterCNN(nn.Module):
             base.conv1,   # 0
             base.relu,    # 2
             base.bn1,     # 1
-            nn.Dropout2d(p=0.2),
+            nn.Dropout2d(p=0.3),
             base.maxpool, # 3
             base.layer1,  # 4
             nn.Dropout2d(p=0.5),
