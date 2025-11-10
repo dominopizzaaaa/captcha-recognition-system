@@ -5,7 +5,7 @@ import os, numpy as np, torch, torch.nn as nn, torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader
 
 DATA_DIR = "/Users/dominopizzaaaa/Desktop/dev/captcha-recognition-system/data"
-NPZ = os.path.join(DATA_DIR, "chars_train.npz")
+NPZ = os.path.join(DATA_DIR, "chars_train_try2.npz")
 CKPT = os.path.join(DATA_DIR, "charcnn.pt")
 
 class CharCNN(nn.Module):
