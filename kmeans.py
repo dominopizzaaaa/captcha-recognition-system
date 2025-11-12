@@ -2,39 +2,34 @@ import cv2
 import numpy as np
 import torch
 
-def add_pos_channels(img: torch.Tensor, mode: str = "norm"):
-  """
-  img: (3, H, W)
-  mode: "norm" for [0,1], "minus1to1" for [-1,1]
-  returns: (5, H, W)
-  """
-  assert img.ndim == 3, "Expected (C, H, W)"
-  H, W, C = img.shape
-  assert C == 3, "Expected 3-channel input"
+def add_pos_channels(img, mode: str = "norm"):
+    """
+    img: numpy array (H, W, 3)
+    mode: "norm" or "minus1to1"
+    returns: numpy array (H, W, 5)
+    """
+    assert img.ndim == 3 and img.shape[2] == 3, "Expected (H, W, 3)"
+    H, W, C = img.shape
 
-  if mode == "norm":
-    xs = torch.linspace(0 ,8000, W, device=img.device)
-    ys = torch.linspace(0, 0, H, device=img.device)
-  elif mode == "minus1to1":
-    xs = torch.linspace(-1, 1, W, device=img.device)
-    ys = torch.linspace(-1, 1, H, device=img.device)
-  else:
-    raise ValueError("mode must be 'norm' or 'minus1to1'")
+    if mode == "norm":
+        xs = np.linspace(0, 1, W, dtype=np.float32)
+        ys = np.linspace(0, 1, H, dtype=np.float32)
+    elif mode == "minus1to1":
+        xs = np.linspace(-1, 1, W, dtype=np.float32)
+        ys = np.linspace(-1, 1, H, dtype=np.float32)
+    else:
+        raise ValueError("mode must be 'norm' or 'minus1to1'")
 
-  # Make 2D grids
-  x_grid = xs.view(1, W, 1).expand(H, W, 1)   # (1, H, W)
-  y_grid = ys.view(H, 1, 1).expand(H, W, 1)   # (1, H, W)
+    x_grid = np.tile(xs, (H, 1))
+    y_grid = np.tile(ys[:, None], (1, W))
 
-  
-  white_mask = (torch.from_numpy(img) == 255).all(dim=-1, keepdim=True)
-  x_grid = x_grid.clone()
-  x_grid[white_mask] = 0
-  y_grid[white_mask] = 0
+    white_mask = (img == 255).all(axis=2)
+    x_grid[white_mask] = 0
+    y_grid[white_mask] = 0
 
-  
-  # Concat: (3 + 2, H, W)
-  out = torch.cat([torch.from_numpy(img), x_grid, y_grid], dim=2)
-  return out
+    out = np.dstack([img, x_grid, y_grid])
+    return out
+
 
 def kmeans(img, k):
   # img = cv2.imread("data/train/zdfvcb-0.png")

@@ -1,0 +1,8 @@
+train: /Users/dominopizzaaaa/Desktop/dev/captcha-recognition-system/data_yolo/train/images # TODO: juan change this
+val: /Users/dominopizzaaaa/Desktop/dev/captcha-recognition-system/data_yolo/val/images
+
+nc: 36
+names: ['0','1','2','3','4','5','6','7','8','9',
+        'A','B','C','D','E','F','G','H','I','J',
+        'K','L','M','N','O','P','Q','R','S','T',
+        'U','V','W','X','Y','Z']
