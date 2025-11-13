@@ -94,42 +94,45 @@ class CaptchaSolver(nn.Module):
         return predicted_chars
 
 
-# ===== Load models =====
-cnt_ckpt = torch.load("letter_counter.pt", map_location=DEVICE)
-model = CaptchaSolver("runs/detect/train5/weights/best.pt")
-model.counterNN.load_state_dict(cnt_ckpt["model"])
-model.to(DEVICE)
-model.eval()
-
 # ===== Prediction function =====
 @torch.no_grad()
 def predict_image(img):
     chars = model(img)
     return "".join(chars)
 
-# ===== Evaluation loop =====
-csv_path = "./data/test/labels.csv"
-samples = pd.read_csv(csv_path)
+if __name__ == '__main__':
+    cnt_ckpt = torch.load("letter_counter.pt", map_location=DEVICE)
+    model = CaptchaSolver("runs/classify/train4/weights/best.pt")
+    model.counterNN.load_state_dict(cnt_ckpt["model"])
+    # ===== Load models =====
+    model.to(DEVICE)
+    print("inference running")
+    model.counterNN.eval()
+    model.yolo_model.model.eval()
 
-true = 0
-false = 0
-length_correct = 0
-length_incorrect = 0
+    # ===== Evaluation loop =====
+    csv_path = "./data/test/labels.csv"
+    samples = pd.read_csv(csv_path)
 
-for row in samples["path"]:
-    img = Image.open(f"./data/test/{row}").convert("RGB")
-    predicted = predict_image(img)
-    truth = row.split('-0')[0].upper()
-    print(predicted, truth)
+    true = 0
+    false = 0
+    length_correct = 0
+    length_incorrect = 0
 
-    if predicted == truth:
-        true += 1
-        length_correct += 1
-    else:
-        false += 1
-        if len(predicted) == len(truth):
+    for row in samples["path"]:
+        img = Image.open(f"./data/test/{row}").convert("RGB")
+        predicted = predict_image(img)
+        truth = row.split('-0')[0].upper()
+        print(predicted, truth)
+
+        if predicted == truth:
+            true += 1
             length_correct += 1
         else:
-            length_incorrect += 1
+            false += 1
+            if len(predicted) == len(truth):
+                length_correct += 1
+            else:
+                length_incorrect += 1
 
-print(true, false, length_correct, length_incorrect)
+    print(true, false, length_correct, length_incorrect)
