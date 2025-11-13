@@ -102,7 +102,7 @@ def predict_image(img):
 
 if __name__ == '__main__':
     cnt_ckpt = torch.load("letter_counter.pt", map_location=DEVICE)
-    model = CaptchaSolver("runs/classify/train4/weights/best.pt")
+    model = CaptchaSolver("runs/classify/train12/weights/best.pt")
     model.counterNN.load_state_dict(cnt_ckpt["model"])
     # ===== Load models =====
     model.to(DEVICE)
