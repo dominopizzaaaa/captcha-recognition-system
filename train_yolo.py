@@ -5,7 +5,7 @@ train_yolo_cls.py — YOLOv8 Classification on sliced character images
 from ultralytics import YOLO
 
 # load a small pretrained model for classification
-model = YOLO("yolov8n-cls.pt")  # can use yolov8s-cls.pt for higher accuracy
+model = YOLO("yolo11x-cls.pt")  # can use yolov8s-cls.pt for higher accuracy
 
 if __name__ == '__main__':
     # train
